@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DigitalBoard — Galvão Drones</title>
+  <script src="p5.min.js"></script>
+  <style>
+  /* ---------------------------------------------------------------
+     Paleta do redesenho (Viewer Galvao.dc.html). Tudo local: a fonte
+     RaceSport vem de assets/, nada de Google Fonts — a bancada pode
+     estar sem internet.
+     --------------------------------------------------------------- */
+  @font-face{
+    font-family:'RaceSport';
+    src:url('assets/RaceSport.ttf') format('truetype');
+    font-display:swap;
+  }
+  :root{
+    --bg:#0B100E; --painel:#0F1512; --cartao:#131A17;
+    --borda:#24302B; --borda2:#3A4A44;
+    --txt:#E6EDE9; --mudo:#8A9A93;
+    --ac:#EF7E13; --ac2:#F5B072; --sobre-ac:#20140A;
+  }
+  *{box-sizing:border-box}
+  html,body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:var(--bg); color:var(--txt);
+    font-family:ui-sans-serif,'Segoe UI',system-ui,sans-serif;
+  }
+  canvas{ max-width:100%; height:auto; display:block; margin:auto; }
+  button,input,select{font-family:inherit}
+  button:focus-visible,input:focus-visible,select:focus-visible{
+    outline:2px solid var(--ac); outline-offset:2px;
+  }
+  ::selection{background:rgba(239,126,19,.35)}
+
+  /* ============ BARRA SUPERIOR (navegar) ============ */
+  #topbar{
+    position:fixed; top:14px; left:14px; right:14px; z-index:1100;
+    display:flex; align-items:stretch; gap:16px; pointer-events:none;
+  }
+  #topbar > *{pointer-events:auto}
+  #navControls{display:flex; align-items:stretch; gap:10px; flex:1 1 auto; min-width:0}
+  #btnHub{
+    width:46px; height:46px; flex:none; border:none; border-radius:10px;
+    background:#0E5847; cursor:pointer; display:grid; place-items:center; padding:8px;
+    box-shadow:0 2px 10px rgba(0,0,0,.45);
+  }
+  #btnHub:hover{background:#15705a}
+  #btnHub img{width:100%; height:100%; object-fit:contain; border:none; display:block}
+  #tituloPlaca{display:flex; flex-direction:column; justify-content:center; gap:3px;
+    flex:0 1 auto; min-width:110px}
+  #tituloPlaca .nome{
+    font-family:'RaceSport',ui-sans-serif,sans-serif; font-size:15px; letter-spacing:.06em;
+    line-height:1; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  #tituloPlaca .sub{display:flex; align-items:center; gap:6px; font-size:10px; letter-spacing:.14em;
+    color:var(--mudo); white-space:nowrap}
+  #tituloPlaca .ponto{width:3px; height:3px; border-radius:50%; background:var(--borda2)}
+  #faceTag{color:var(--ac)}
+
+  /* os <select> de placa e de modelo sao criados por JS dentro de #controls;
+     o skin.js traz os dois pra ca assim que aparecem. */
+  #navControls select{
+    align-self:center; height:38px; flex:0 1 auto; min-width:96px; max-width:190px; padding:0 10px;
+    background:var(--cartao); color:var(--txt);
+    border:1px solid var(--borda); border-radius:10px;
+    font-size:12px; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.35);
+  }
+  #navControls select:hover{border-color:var(--borda2)}
+
+  #buscaCaixa{flex:0 1 380px; min-width:150px; display:flex; align-items:center}
+  #buscaCaixa .campo{
+    display:flex; align-items:center; width:100%; min-width:0; height:38px;
+    background:var(--cartao); border:1px solid var(--borda); border-radius:10px;
+    padding:0 10px; gap:8px; box-shadow:0 2px 10px rgba(0,0,0,.35);
+  }
+  #buscaCaixa .campo:focus-within{border-color:var(--ac)}
+  #searchComponent{
+    flex:1; min-width:0; height:100%; background:transparent; border:none;
+    color:var(--txt); font-size:13px; outline:none;
+  }
+  #searchComponent::placeholder{color:var(--mudo)}
+  #buscaCaixa kbd{
+    flex:none; font-family:ui-monospace,Consolas,monospace; font-size:10px; color:var(--mudo);
+    background:var(--bg); border:1px solid var(--borda); border-radius:4px; padding:2px 5px;
+  }
+
+  /* ============ CARTAO DE TENSAO ============ */
+  #voltCard{
+    position:fixed; top:70px; left:300px; z-index:1050; min-width:150px;
+    background:var(--cartao); border:1px solid var(--borda); border-left:3px solid var(--ac);
+    border-radius:10px; padding:8px 12px 9px; box-shadow:0 2px 10px rgba(0,0,0,.35);
+    transition:left .18s ease;
+  }
+  #voltCard.encolhido{left:66px}
+  #voltCard .rot{font-size:10px; letter-spacing:.14em; color:var(--mudo); margin-bottom:2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px}
+  #voltCard .linha{display:flex; align-items:baseline; gap:4px}
+  /* leitura de diodo (tecla D); vermelho quando diverge da placa de referencia */
+  #voltDiodo{margin:5px 0 0}
+  #voltDiodo.diverge{color:#FF5A4E; font-weight:600}
+  .diverge{color:#FF5A4E !important; font-weight:600}
+  /* consenso do time (fase 2): verde = validado; ambar = divergente; vermelho = esta placa fora */
+  .cons-validado{color:#5FBF8A !important; font-weight:600}
+  .cons-confirmado{color:#9FD8B5 !important}
+  .cons-nao_confirmado{color:var(--mudo) !important}
+  .cons-divergente{color:var(--ac2) !important; font-weight:600}
+  .cons-fora{color:#FF5A4E !important; font-weight:600}
+  #voltageDisplay{
+    font-family:'RaceSport',ui-monospace,monospace; font-size:30px; line-height:1; color:var(--ac2);
+  }
+  #voltCard .un{font-family:'RaceSport',ui-monospace,monospace; font-size:13px; color:var(--mudo)}
+
+  /* ============ PAINEL ESQUERDO ============ */
+  #componentInfo{
+    position:fixed; left:0; top:0; bottom:0; width:286px; z-index:1040;
+    background:var(--painel); border-right:1px solid var(--borda);
+    display:flex; flex-direction:column;
+    padding:132px 14px 88px; overflow-y:auto; overflow-x:hidden;
+    font-size:12px; color:var(--txt);
+    transition:width .18s ease;
+    scrollbar-width:thin; scrollbar-color:var(--borda2) transparent;
+  }
+  #componentInfo.fechado{width:52px}
+  #componentInfo.fechado > *{opacity:0; pointer-events:none}
+  #componentInfo > *{transition:opacity .16s ease}
+  #componentInfo h3{
+    font-size:10px; letter-spacing:.14em; color:var(--mudo);
+    font-weight:400; margin:0 0 10px;
+  }
+  #componentInfo::-webkit-scrollbar{width:8px}
+  #componentInfo::-webkit-scrollbar-track{background:transparent}
+  #componentInfo::-webkit-scrollbar-thumb{background-color:var(--borda2); border-radius:4px}
+
+  #btnPainel{
+    position:fixed; top:132px; left:285px; z-index:1045;
+    width:28px; height:34px; border:1px solid var(--borda); border-left:none;
+    border-radius:0 8px 8px 0; background:var(--cartao); color:var(--mudo);
+    cursor:pointer; display:grid; place-items:center; transition:left .18s ease;
+  }
+  #btnPainel:hover{color:var(--ac)}
+  #btnPainel svg{width:13px; height:13px; transform:rotate(180deg); transition:transform .18s ease}
+  #btnPainel.encolhido{left:51px}
+  #btnPainel.encolhido svg{transform:none}
+
+  /* blocos que o SCRIPT3 escreve dentro de #componentDetails */
+  .summary{color:var(--mudo); font-size:10px; letter-spacing:.14em; margin-bottom:8px}
+  .info-box{
+    background:var(--bg); border:1px solid var(--borda); border-radius:6px;
+    padding:5px 8px; margin-bottom:4px; letter-spacing:normal; font-size:12px;
+  }
+  .info-label{color:var(--mudo)}
+  .info-value{color:var(--txt); font-family:ui-monospace,Consolas,monospace; font-size:11px}
+  #componentInfo hr{
+    border:none; height:1px; margin:10px 0;
+    background:linear-gradient(to right,transparent,var(--borda) 12%,var(--borda) 88%,transparent);
+  }
+  .group{margin-bottom:10px}
+  .group-title{font-weight:600; color:var(--mudo); background:transparent; padding:3px 0; margin-bottom:4px;
+    font-size:10px; letter-spacing:.14em}
+  .group-items{display:flex; flex-wrap:wrap; gap:5px}
+  .item{
+    font-family:ui-monospace,Consolas,monospace; font-size:11px;
+    background:var(--bg); border:1px solid var(--borda); border-radius:5px;
+    padding:3px 7px; color:var(--txt);
+  }
+
+  /* botoes do painel (o RENOMEAR e o 💾 nascem com style inline no renomear.js,
+     por isso os !important — e mais barato sobrescrever aqui do que reescrever la) */
+  #componentInfo button{
+    height:32px !important; border-radius:8px !important; cursor:pointer !important;
+    font-size:11px !important; letter-spacing:.08em !important; padding:0 10px !important;
+    background:transparent !important; color:var(--mudo) !important;
+    border:1px solid var(--borda) !important;
+  }
+  #componentInfo button:hover{color:var(--txt) !important; border-color:var(--borda2) !important}
+  #btnRenomear{color:var(--ac) !important; border-color:var(--ac) !important; flex:1}
+  #btnRenomear:hover{background:rgba(239,126,19,.12) !important}
+  #openModalBtn{width:100%; margin-top:10px; flex:none}
+
+  /* caderno de bancada (medicoes.js) */
+  #caderno{display:grid; gap:7px; padding-bottom:12px; margin-bottom:14px; border-bottom:1px solid var(--borda)}
+  #caderno h3{margin:0}
+  .cad-linha{display:flex; align-items:center; gap:6px; flex-wrap:wrap}
+  .cad-rot{font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--mudo); min-width:52px}
+  #componentInfo #cadTecnico{height:28px !important; color:var(--txt) !important; flex:1; text-align:left;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; letter-spacing:.02em !important}
+  #cadOS{flex:1; min-width:0; height:28px; padding:0 8px; background:var(--bg); color:var(--txt);
+    border:1px solid var(--borda); border-radius:8px; font-family:ui-monospace,Consolas,monospace; font-size:12px}
+  #cadOS:focus{outline:none; border-color:var(--ac)}
+  .cad-seg{display:flex; gap:2px; padding:2px; background:var(--bg); border:1px solid var(--borda); border-radius:8px}
+  #componentInfo .cad-seg button{height:24px !important; padding:0 8px !important; border:none !important;
+    border-radius:6px !important; letter-spacing:.04em !important}
+  #componentInfo .cad-seg button.on{background:var(--ac) !important; color:var(--sobre-ac) !important; font-weight:600}
+  .cad-dica{margin:0; font-size:10.5px; color:var(--mudo)}
+  .cad-pe{display:flex; align-items:center; gap:8px; font-size:11px}
+  .cad-status{flex:1; min-width:0}
+  .cad-status.ok{color:#5FBF8A}
+  .cad-status.pendente{color:var(--ac2)}
+  #componentInfo #cadRecusadas{height:22px !important; padding:0 6px !important; color:#FF5A4E !important;
+    border-color:#FF5A4E !important; letter-spacing:.02em !important}
+  #cadCsv{color:var(--mudo); font-size:11px}
+  #cadCsv:hover{color:var(--ac)}
+
+  /* ============ MODAL DA MALHA ============ */
+  /* A camada do modal cobre a tela inteira e e transparente: se ela pegasse clique,
+     travava tudo sem nada visivel (o clique-fora-fecha nunca chegava, porque o
+     protegerControles() barra a propagacao no #componentModal). Ela nao pega clique;
+     so a lista pega. Vira uma gaveta ao lado do painel. */
+  .modal{display:none; position:fixed; z-index:1060; width:100%; height:100%; background:transparent;
+    pointer-events:none}
+  .modal-content{pointer-events:auto}
+  .modal-content{
+    position:absolute; top:0; left:286px; bottom:0; width:230px;
+    background:var(--painel); border-right:1px solid var(--borda);
+    /* topo igual ao do painel: com padding 14px o titulo e o X ficavam por baixo da
+       barra superior, e o unico jeito visivel de fechar sumia */
+    padding:132px 14px 88px; overflow-y:auto; color:var(--txt); font-size:12px;
+    scrollbar-width:thin; scrollbar-color:var(--borda2) transparent;
+  }
+  .modal-content h3{font-size:10px; letter-spacing:.14em; color:var(--mudo); font-weight:400; margin:0 0 10px}
+  .close{color:var(--mudo); float:right; font-size:20px; font-weight:bold; cursor:pointer; line-height:1}
+  .close:hover{color:var(--ac)}
+
+  /* ============ DOCK INFERIOR (#controls) ============ */
+  #dock{
+    position:fixed; left:286px; right:0; bottom:18px; z-index:1100;
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    pointer-events:none; transition:left .18s ease;
+  }
+  #dock.encolhido{left:52px}
+  #dock > *{pointer-events:auto}
+  #controls{
+    width:max-content; max-width:calc(100vw - 340px);
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px;
+    padding:7px; background:rgba(19,26,23,.94); border:1px solid var(--borda);
+    border-radius:14px; box-shadow:0 6px 26px rgba(0,0,0,.5); backdrop-filter:blur(6px);
+  }
+  #controls .sep{width:1px; height:30px; background:linear-gradient(to bottom,transparent,var(--borda),transparent)}
+  #controls .seg{display:flex; gap:2px; background:var(--bg); border:1px solid var(--borda); border-radius:10px; padding:3px}
+  #controls .grupo{display:flex; gap:2px}
+
+  #controls button{
+    height:38px; border:none; border-radius:8px; background:transparent; color:var(--mudo);
+    cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+    font-size:11px; letter-spacing:.08em; padding:0 12px; white-space:nowrap;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  #controls button.icone{width:38px; padding:0}
+  #controls button svg{width:19px; height:19px; flex:none}
+  #controls button:hover{background:#1B241F; color:var(--txt)}
+  #controls .seg button{padding:0 13px; border-radius:7px}
+  #controls button.contorno{border:1px solid var(--borda)}
+  #controls button.contorno:hover{border-color:var(--borda2); background:transparent; color:var(--txt)}
+  #controls button.acento{border:1px solid var(--ac); color:var(--ac); background:transparent}
+  #controls button.acento:hover{background:rgba(239,126,19,.14); color:var(--ac)}
+  /* estado LIGADO — o !important cobre o style inline que o ajuste_fundo.js escreve */
+  #controls button.on{
+    background:var(--ac) !important; color:var(--sobre-ac) !important;
+    border-color:var(--ac) !important; font-weight:600;
+  }
+  #controls .rot{white-space:nowrap}
+
+  /* moldura de "modo ajuste ligado" */
+  #ajusteMoldura{
+    position:fixed; inset:0; z-index:1000; pointer-events:none;
+    border:0 solid rgba(239,126,19,0);
+  }
+  #ajusteMoldura.on{border:2px solid var(--ac); box-shadow:inset 0 0 60px rgba(239,126,19,.10)}
+
+  /* aviso do ajuste (criado no ajuste_fundo.js com style inline) */
+  #avisoAjuste{
+    left:50% !important; transform:translateX(-50%) !important;
+    bottom:var(--aviso-bottom,74px) !important; right:auto !important;
+    background:var(--ac) !important; color:var(--sobre-ac) !important;
+    border:none !important; border-radius:9px !important;
+    padding:9px 14px !important; font:12px/1.2 ui-sans-serif,'Segoe UI',system-ui,sans-serif !important;
+    letter-spacing:.02em !important; box-shadow:0 4px 18px rgba(0,0,0,.5) !important;
+    max-width:min(680px,calc(100vw - 340px)) !important; z-index:1200 !important;
+  }
+
+  /* tooltip do pino */
+  #pinDisplay{
+    position:fixed; top:1000px; left:0; width:0; height:70px; padding:10px;
+    background:var(--cartao); border:1px solid var(--borda); border-radius:8px;
+    font-size:13px; color:var(--txt); z-index:1030;
+    display:flex; align-items:center; justify-content:center; text-align:left;
+  }
+  #netInput{display:none}
+  </style>
+</head>
+<body>
+
+  <div id="ajusteMoldura"></div>
+  <div id="pinDisplay"></div>
+
+  <!-- ---------- navegar ---------- -->
+  <div id="topbar">
+    <div id="navControls">
+      <button id="btnHub" type="button" title="Voltar para o HUB">
+        <img src="assets/gd-logo-white.svg" alt="Galvão Drones — HUB">
+      </button>
+      <div id="tituloPlaca">
+        <div class="nome" id="nomePlaca">—</div>
+        <div class="sub">
+          <span>DIGITALBOARD</span>
+          <span class="ponto"></span>
+          <span id="faceTag">FACE TOP</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="buscaCaixa">
+      <div class="campo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#8A9A93" stroke-width="2" style="width:15px;height:15px;flex:none"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 21 21"></path></svg>
+        <input id="searchComponent" type="text" placeholder="componente, placa ou arquivo" list="componentList" autocomplete="off">
+        <datalist id="componentList"></datalist>
+        <kbd>/</kbd>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- cartao de tensao ---------- -->
+  <div id="voltCard">
+    <div class="rot" id="voltNet">MALHA —</div>
+    <div class="linha">
+      <span id="voltageDisplay"></span>
+      <span class="un">V</span>
+    </div>
+    <div class="rot" id="voltDiodo" hidden></div>
+  </div>
+
+  <!-- ---------- painel esquerdo ---------- -->
+  <div id="componentInfo">
+    <!-- caderno de bancada (medicoes.js): quem mede, qual OS, em que condicao -->
+    <section id="caderno" aria-label="Caderno de bancada">
+      <h3>CADERNO</h3>
+      <div class="cad-linha"><span class="cad-rot">Técnico</span>
+        <button id="cadTecnico" type="button" title="Trocar o nome do técnico deste navegador">definir nome</button></div>
+      <div class="cad-linha"><label class="cad-rot" for="cadOS">OS</label>
+        <input id="cadOS" type="text" maxlength="30" placeholder="nº da OS da placa" autocomplete="off"></div>
+      <div class="cad-linha"><span class="cad-rot">Tensão</span>
+        <div class="cad-seg" id="cadAlim" title="Como a placa está sendo alimentada">
+          <button type="button" data-v="fonte">fonte</button><button type="button" data-v="bateria">bateria</button></div>
+        <div class="cad-seg" id="cadMomento" title="15 s = ligada e estável; boot = durante a inicialização">
+          <button type="button" data-v="estavel">15 s</button><button type="button" data-v="boot">boot</button></div></div>
+      <p class="cad-dica">V / D = esta placa · Shift+V / Shift+D = placa boa</p>
+      <div class="cad-pe">
+        <span id="cadStatus" class="cad-status">—</span>
+        <button id="cadRecusadas" type="button" hidden>0 recusada(s)</button>
+        <a id="cadCsv" href="#" title="Baixar todas as leituras desta placa">CSV</a>
+      </div>
+    </section>
+    <h3>DADOS DETALHADOS</h3>
+    <div id="componentDetails"></div>
+    <button id="openModalBtn" type="button">🔍 COMP/ INTERLIGADO</button>
+  </div>
+  <button id="btnPainel" type="button" title="Painel de dados (Tab)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5l7 7-7 7"></path></svg>
+  </button>
+
+  <!-- ---------- modal da malha ---------- -->
+  <div id="componentModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h3>COMPONENTES NA MALHA</h3>
+      <div id="listaDaMalha"></div>
+    </div>
+  </div>
+
+  <!-- ---------- dock ---------- -->
+  <div id="dock">
+    <div id="controls">
+
+      <div class="seg">
+        <button id="btnTop"    type="button" title="So a face TOP">TOP</button>
+        <button id="btnBottom" type="button" title="So a face BOTTOM">BOTTOM</button>
+        <button id="btnAll"    type="button" title="As duas faces lado a lado">AMBOS</button>
+        <button id="btnFaceUnica" type="button" title="Dobra as duas metades uma sobre a outra: um lado por vez, no mesmo lugar (tecla F)"><span class="rot" data-rot>2 FACES</span></button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="grupo">
+        <button id="btnRotate" class="icone" type="button" title="Girar 90°">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 9h7a5 5 0 1 1 0 10H7"></path><path d="M4 9l4-4M4 9l4 4"></path></svg>
+        </button>
+        <button id="flipButton" class="icone" type="button" title="Espelhar horizontal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v18"></path><path d="M8 7 4 12l4 5z"></path><path d="M16 7l4 5-4 5z"></path></svg>
+        </button>
+      </div>
+
+      <div class="sep"></div>
+
+      <button id="toggleBgBtn" type="button" title="Fundo: bordas / foto / sem fundo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 15l5-4 4 3 3-2 6 4"></path><circle cx="8.5" cy="9.5" r="1.3"></circle></svg>
+        <span class="rot" data-rot>BORDAS</span>
+      </button>
+
+      <div class="sep"></div>
+
+      <button id="btnVolt" class="acento" type="button" title="Definir tensao MEDIDA da malha selecionada (tecla V)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" style="width:18px;height:18px"><path d="M13 2 5 14h6l-1 8 8-12h-6z"></path></svg>
+        <span>TENSÃO</span>
+      </button>
+
+      <button id="btnNextNet" class="contorno" type="button" title="Proximo pino da malha (Enter)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" style="width:18px;height:18px"><path d="M12 4v14M6 13l6 6 6-6"></path></svg>
+        <span>PRÓXIMO</span>
+      </button>
+
+      <div class="sep"></div>
+
+      <button id="btnAjuste" class="contorno" type="button" title="Liga o modo de ajuste da foto (tecla A). Shift+clique mostra a ajuda.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" style="width:18px;height:18px"><circle cx="12" cy="12" r="7.5"></circle><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"></path></svg>
+        <span class="rot" data-rot>AJUSTE</span>
+      </button>
+
+      <button id="btnDesfazer" class="icone" type="button" title="Desfaz o ultimo ajuste (Ctrl+Z). Shift+clique volta a placa toda ao automatico.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 14L4 9l5-5"></path><path d="M4 9h10a6 6 0 0 1 0 12h-3"></path></svg>
+      </button>
+
+    </div>
+  </div>
+
+  <script>
+    // apelidos de malha (Net161 -> BATERIA_ENTRADA): fetch comum, fora do preload do
+    // p5 — ausente ou invalido vira {} e o viewer abre com os nomes crus
+    window.__malhas = {};
+    window.__malhasP = fetch('build/malhas.json', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : {})
+      .catch(() => ({}));
+
+    function preload() {
+       // placa via ?board=<id> (default mini2). Assets por convencao; imagens ausentes viram null.
+       let params = getURLParams();
+       // id da placa: calculado AQUI e publicado, p/ o SCRIPT3.js nao calcular outro
+       // (quando um dos dois ficava velho no cache, o .bvr vinha de uma placa e a
+       // foto de outra — e a foto simplesmente sumia)
+       let board = params.board || 'mine2';   // tem que existir em build/DRONE
+       window.__board = board;
+       // Os apelidos de malha NAO entram no preload: no p5 1.6 um loadJSON que falha
+       // (arquivo ausente ou com uma virgula sobrando) nunca libera o preload, e o
+       // viewer de TODAS as placas fica em "Loading..." sem erro nenhum. Eles vem
+       // pelo window.__malhasP (acima), e o setup() reaplica quando chegam.
+       let v = '?v=7';  // cache-buster: bump ao regenerar os assets (forca recarga)
+       // a foto agora vem por metade (build/FOTO/<placa>_s*.jpg), carregada em
+       // ajuste_fundo.js; aqui fica so a borda tracada do DigitalBoard.
+       bgImage    = loadImage('build/SM/'   + board + '_borda.jpg' + v, () => {}, () => { bgImage = null; });
+       // se a placa nao existe, cai na primeira do boards.json em vez de abrir vazio
+       fileContent = loadStrings('build/DRONE/' + board + '.bvr' + v, () => {}, () => {
+         fetch('build/boards.json').then(r => r.json()).then(l => {
+           if (l.length && l[0].id !== board) location.search = '?board=' + l[0].id;
+         }).catch(() => {});
+       });
+   }
+  </script>
+
+  <script src="skin.js?v=25"></script>
+  <script src="renomear.js?v=25"></script>
+  <script src="diodo.js?v=25"></script>
+  <script src="medicoes.js?v=25"></script>
+  <script src="cobre.js?v=25"></script>
+  <script src="classificar.js?v=25"></script>
+  <script src="menu_modelo.js?v=25"></script>
+  <script src="face_unica.js?v=25"></script>
+  <script src="ajuste_fundo.js?v=25"></script>
+  <script src="SCRIPT3.js?v=25"></script>
+</body>
+</html>

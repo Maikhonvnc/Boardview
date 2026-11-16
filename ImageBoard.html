@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Placa por Imagem — pontos de tensão</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font:14px/1.4 system-ui,Segoe UI,sans-serif;background:#0e1116;color:#e6edf3;overflow:hidden}
+#bar{display:flex;gap:8px;align-items:center;padding:8px 12px;background:#161b22;border-bottom:1px solid #263041;flex-wrap:wrap}
+#bar b{font-size:15px;margin-right:6px}
+button,label.btn{background:#182030;border:1px solid #2b3a52;color:#cdd9e5;padding:5px 11px;border-radius:7px;cursor:pointer;font-size:13px}
+button:hover,label.btn:hover{background:#1f2b40}
+button.on{background:#122019;border-color:#1f6f43;color:#4ade80}
+#name{background:#0e1116;border:1px solid #2b3a52;color:#e6edf3;border-radius:6px;padding:5px 9px;min-width:160px}
+#stage{position:absolute;inset:44px 0 0 0;overflow:hidden;cursor:grab;background:#0a0d11}
+#stage.add{cursor:crosshair}
+#canvas{position:absolute;transform-origin:0 0}
+#img{display:block;max-width:none;user-select:none;-webkit-user-drag:none}
+.pt{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;cursor:pointer;pointer-events:auto}
+.dot{width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #000,0 1px 3px #000}
+.lab{margin-top:1px;font-size:11px;font-weight:700;background:rgba(0,0,0,.72);padding:0 4px;border-radius:4px;white-space:nowrap;color:#fff}
+.hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:#161b22cc;border:1px solid #263041;border-radius:8px;padding:6px 12px;color:#9aa7b8;font-size:12px}
+#legend{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.lg{font-size:11px;padding:1px 7px;border-radius:5px;border:1px solid #333;color:#fff}
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;color:#7d8ba0;text-align:center;padding:20px}
+#empty h2{color:#cdd9e5;margin:0}
+kbd{background:#263041;border-radius:4px;padding:1px 5px;font-size:12px}
+</style></head>
+<body>
+<div id="bar">
+  <b>🔧 Placa por Imagem</b>
+  <input id="name" placeholder="nome da placa (ex.: Mavic3 ESC)">
+  <label class="btn">📷 Foto<input id="fimg" type="file" accept="image/*" hidden></label>
+  <button id="addBtn">➕ Adicionar ponto</button>
+  <button id="save">💾 Exportar</button>
+  <label class="btn">📂 Importar<input id="fjson" type="file" accept=".json" hidden></label>
+  <button id="clr">🗑️ Limpar</button>
+  <div id="legend"></div>
+</div>
+<div id="stage">
+  <div id="canvas"><img id="img" alt=""></div>
+  <div id="empty"><h2>Carregue uma foto da placa</h2>
+    <div>Clique <b>📷 Foto</b>, depois <b>➕ Adicionar ponto</b> e clique sobre a placa para marcar a tensão.<br>
+    Arraste para mover · roda do mouse para zoom · clique num ponto para editar/apagar.</div></div>
+  <div class="hint" id="hint" hidden></div>
+</div>
+<script>
+// ---- paleta estilo Digital Board (tensao -> cor) ----
+const PAL=[[5.0,'#22c55e'],[3.3,'#0ea5e9'],[3.2,'#166534'],[2.6,'#22d3ee'],[1.8,'#f97316'],
+ [1.6,'#ef4444'],[1.5,'#fb923c'],[1.4,'#3b82f6'],[1.1,'#991b1b'],[0.3,'#a855f7']];
+function colorFor(v){const n=parseFloat(String(v).replace(',','.'));if(isNaN(n))return '#e5e7eb';
+ let best=PAL[0],bd=9e9;for(const[val,c]of PAL){const d=Math.abs(val-n);if(d<bd){bd=d;best=[val,c]}}return best[1];}
+function buildLegend(){document.getElementById('legend').innerHTML=
+ PAL.map(([v,c])=>`<span class="lg" style="background:${c}">${v}V</span>`).join('');}
+buildLegend();
+
+const stage=document.getElementById('stage'),canvas=document.getElementById('canvas'),img=document.getElementById('img');
+const nameEl=document.getElementById('name'),hint=document.getElementById('hint'),empty=document.getElementById('empty');
+let pts=[], scale=1, tx=0, ty=0, adding=false, imgLoaded=false;
+
+function apply(){canvas.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;}
+function key(){return 'imgboard:'+(nameEl.value||'sem-nome');}
+function persist(){try{localStorage.setItem(key(),JSON.stringify({src:img.src,pts}));}catch(e){}}
+function draw(){
+ document.querySelectorAll('.pt').forEach(e=>e.remove());
+ pts.forEach((p,i)=>{const d=document.createElement('div');d.className='pt';
+  d.style.left=(p.x*img.naturalWidth)+'px';d.style.top=(p.y*img.naturalHeight)+'px';
+  d.innerHTML=`<div class="dot" style="background:${colorFor(p.v)}"></div>`+
+    (p.v||p.l?`<div class="lab">${(p.v?p.v+'V':'')}${p.l?(' '+p.l):''}</div>`:'');
+  d.onclick=ev=>{ev.stopPropagation();editPt(i)};canvas.appendChild(d);});
+ persist();
+}
+function editPt(i){const p=pts[i];
+ const v=prompt('Tensão (ex.: 3.3, 0V, diodo 0.45) — vazio p/ apagar:',p.v||'');
+ if(v===null)return; if(v.trim()===''){pts.splice(i,1);draw();return;}
+ const l=prompt('Rótulo (opcional, ex.: VBAT, BOTÃO, TP12):',p.l||'')||'';
+ p.v=v.trim().replace(/v$/i,'');p.l=l.trim();draw();}
+
+document.getElementById('fimg').onchange=e=>{const f=e.target.files[0];if(!f)return;
+ const r=new FileReader();r.onload=()=>{img.src=r.result;};r.readAsDataURL(f);
+ if(!nameEl.value)nameEl.value=f.name.replace(/\.[^.]+$/,'');};
+img.onload=()=>{if(!img.src)return;imgLoaded=true;empty.hidden=true;hint.hidden=false;
+ hint.textContent='Modo: '+(adding?'ADICIONAR — clique para marcar':'navegar');
+ // fit inicial
+ const sw=stage.clientWidth,sh=stage.clientHeight;scale=Math.min(sw/img.naturalWidth,sh/img.naturalHeight)*0.96;
+ tx=(sw-img.naturalWidth*scale)/2;ty=(sh-img.naturalHeight*scale)/2;apply();draw();};
+
+const addBtn=document.getElementById('addBtn');
+addBtn.onclick=()=>{adding=!adding;addBtn.classList.toggle('on',adding);stage.classList.toggle('add',adding);
+ hint.textContent='Modo: '+(adding?'ADICIONAR — clique para marcar':'navegar');};
+
+// clique no stage: adiciona ponto (em coords relativas 0..1 da imagem)
+canvas.addEventListener('click',e=>{if(!adding||!imgLoaded)return;
+ const r=img.getBoundingClientRect();
+ const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+ if(x<0||x>1||y<0||y>1)return;
+ const v=prompt('Tensão neste ponto (ex.: 3.3, 5, 0, diodo 0.45):','');if(v===null)return;
+ const l=prompt('Rótulo (opcional):','')||'';
+ pts.push({x,y,v:v.trim().replace(/v$/i,''),l:l.trim()});draw();});
+
+// pan + zoom
+let drag=null;
+stage.addEventListener('mousedown',e=>{if(adding)return;drag={x:e.clientX-tx,y:e.clientY-ty};stage.style.cursor='grabbing';});
+addEventListener('mousemove',e=>{if(!drag)return;tx=e.clientX-drag.x;ty=e.clientY-drag.y;apply();});
+addEventListener('mouseup',()=>{drag=null;stage.style.cursor='';});
+stage.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY<0?1.12:1/1.12;
+ const r=stage.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
+ tx=mx-(mx-tx)*f;ty=my-(my-ty)*f;scale*=f;apply();},{passive:false});
+
+// exportar / importar / limpar
+document.getElementById('save').onclick=()=>{
+ const blob=new Blob([JSON.stringify({name:nameEl.value,src:img.src,pts},null,1)],{type:'application/json'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+ a.download=(nameEl.value||'placa')+'.imgboard.json';a.click();};
+document.getElementById('fjson').onchange=e=>{const f=e.target.files[0];if(!f)return;
+ const r=new FileReader();r.onload=()=>{const d=JSON.parse(r.result);
+  nameEl.value=d.name||'';pts=d.pts||[];if(d.src){img.src=d.src;}else{draw();}};r.readAsText(f);};
+document.getElementById('clr').onclick=()=>{if(confirm('Apagar todos os pontos desta placa?')){pts=[];draw();}};
+nameEl.onchange=()=>{const raw=localStorage.getItem(key());if(raw){const d=JSON.parse(raw);pts=d.pts||[];if(d.src)img.src=d.src;}};
+</script></body></html>

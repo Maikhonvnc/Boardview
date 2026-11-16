@@ -1,0 +1,10 @@
+# Todo dia as 03:00; se o servidor estava desligado nessa hora, roda ao ligar.
+[Unit]
+Description=Boardview - backup diario do banco de medicoes
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
