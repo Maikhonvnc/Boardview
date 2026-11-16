@@ -26,7 +26,7 @@ import medicoes_db as MDB          # caderno de bancada: /api/leituras (fase 1, 
 import consenso                    # regra do "validado por N" (fase 2)
 import anotacoes as ANOT           # classificacao/nomes por placa (dados/anotacoes)
 
-PORTA = int(sys.argv[1]) if len(sys.argv) > 1 else 8777   # 'python servidor.py 8788' p/ testar noutra porta
+PORTA = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 8777   # 'python servidor.py 8788' p/ testar noutra porta
 
 HOSTS = {f'127.0.0.1:{PORTA}', f'localhost:{PORTA}'} | {
     h.strip().lower() for h in os.environ.get('BOARDVIEW_HOSTS', '').split(',') if h.strip()}
