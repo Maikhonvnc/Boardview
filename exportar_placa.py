@@ -10,18 +10,13 @@
 import os, re, sys, json, sqlite3
 from paths import BV
 import anotacoes as ANOT
+import bvr as BVR
 
 VIEW = os.path.join(BV, 'digital_viewer', 'build')
 
 
-def canon(malha):
-    """"7P0_Net9" -> "Net9": apelidos e medicoes podem estar com ou sem o prefixo de tensao."""
-    m = re.search(r'(Net\d+)$', malha or '')
-    return m.group(1) if m else malha
-
-
 def achar(d, malha):
-    return d.get(malha) or d.get(canon(malha))
+    return d.get(malha) or d.get(BVR.canon(malha))
 
 
 def ler(caminho, padrao):
@@ -33,24 +28,10 @@ def ler(caminho, padrao):
 
 
 def pecas_bvr(placa):
-    pecas, peca, pino = [], None, None
-    for ln in open(os.path.join(VIEW, 'DRONE', placa + '.bvr'), encoding='utf-8', errors='replace'):
-        s = ln.split()
-        if not s:
-            continue
-        if s[0] == 'PART_NAME':
-            peca = {'id': s[1], 'pinos': []}
-            pecas.append(peca)
-        elif s[0] == 'PART_SIDE' and peca:
-            peca['lado'] = s[1]
-        elif s[0] == 'PIN_NUMBER' and peca:
-            pino = {'pino': s[1]}
-            peca['pinos'].append(pino)
-        elif s[0] == 'PIN_ORIGIN' and pino is not None:
-            pino['x'], pino['y'] = float(s[1]), float(s[2])
-        elif s[0] == 'PIN_NET' and pino is not None:
-            pino['malha'] = ' '.join(s[1:])
-    return pecas
+    return [{'id': p['id'], 'lado': p['lado'],
+             'pinos': [{'pino': q['pino'], 'x': q['x'], 'y': q['y'], 'malha': q['malha'] or None}
+                       for q in p['pinos'] if q['x'] is not None]}
+            for p in BVR.pecas(placa)]
 
 
 def main():

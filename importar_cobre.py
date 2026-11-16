@@ -12,6 +12,7 @@
 import os, json, glob
 import numpy as np
 from paths import BV
+import bvr as BVR
 
 DRONE = os.path.join(BV, 'digital_viewer', 'build', 'DRONE')
 COBRE = os.path.join(BV, 'digital_viewer', 'build', 'COBRE')
@@ -19,17 +20,9 @@ COBRE = os.path.join(BV, 'digital_viewer', 'build', 'COBRE')
 
 def pinos_bvr(caminho):
     """{(PECA, PINO): (x, y)} do .bvr."""
-    out, peca, pino = {}, None, None
-    for ln in open(caminho, encoding='utf-8', errors='replace'):
-        s = ln.strip()
-        if s.startswith('PART_NAME '):
-            peca = s.split(None, 1)[1]
-        elif s.startswith('PIN_NUMBER '):
-            pino = s.split(None, 1)[1]
-        elif s.startswith('PIN_ORIGIN') and peca and pino is not None:
-            x, y = map(float, s.split()[1:3])
-            out[(peca, pino)] = (x, y)
-    return out
+    return {(p['id'], q['pino']): (q['x'], q['y'])
+            for p in BVR.pecas(caminho) for q in p['pinos']
+            if q['pino'] is not None and q['x'] is not None}
 
 
 def main():
