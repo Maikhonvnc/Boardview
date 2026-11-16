@@ -1,0 +1,28 @@
+# Servidor central do Boardview (viewer + caderno de medicoes + consenso).
+# Escuta so em 127.0.0.1:8777; o Tailscale publica para a tailnet ("tailscale serve").
+# Instalado por instalar.sh. Configuracao em /etc/boardview.env.
+[Unit]
+Description=Boardview central (viewer + medicoes)
+After=network.target
+
+[Service]
+User=boardview
+Group=boardview
+WorkingDirectory=/opt/boardview
+EnvironmentFile=-/etc/boardview.env
+Environment=BOARDVIEW_DADOS=/var/lib/boardview
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/boardview/servidor.py 8777
+Restart=on-failure
+RestartSec=5
+
+# o processo so escreve no banco e nos ajustes de foto; o resto do disco fica so leitura
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/boardview /opt/boardview/digital_viewer/build/ajustes
+
+[Install]
+WantedBy=multi-user.target

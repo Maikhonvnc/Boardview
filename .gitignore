@@ -1,0 +1,30 @@
+# --- estado dos tecnicos e bancos (tem backup proprio; nao e codigo) ---
+dados/
+central.txt
+
+# --- dados das placas: material de terceiros (DJI) e pesado. NAO vai para repositorio
+#     publico. Ficam no PC / no pacote do central (empacotar_central.py). ---
+digital_viewer/build/
+boards/
+thumbs/
+Malhas/
+Cadernos/
+Netlists/
+Referencias/
+viewer_data/
+PDFs-Drone/
+DigitalBoard/
+OpenBoardView/
+video_mini2/
+exportados/
+mini2_animacao.json
+
+# --- gerado / temporario ---
+qc/
+arquivo-morto/
+Viewer redesign Galv/
+*.zip
+__pycache__/
+*.pyc
+*.tmp
+*.bak

@@ -1,0 +1,19 @@
+# Backup do banco de medicoes: copia consistente (API de backup do SQLite), restauracao
+# de teste (abre a copia e calcula o consenso) e guarda as 30 mais novas.
+# Disparado todo dia pelo boardview-backup.timer.
+[Unit]
+Description=Boardview - backup do banco de medicoes
+
+[Service]
+Type=oneshot
+User=boardview
+Group=boardview
+WorkingDirectory=/opt/boardview
+Environment=BOARDVIEW_DADOS=/var/lib/boardview
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/boardview/medicoes_db.py backup /var/backups/boardview 30
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/boardview /var/backups/boardview
