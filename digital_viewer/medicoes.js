@@ -360,6 +360,12 @@ function cadernoPintar() {
             else if (s.faltam) txt += ` · ${s.faltam} indo para o central`;
             else if (s.erro) txt += ' · central fora do ar';
             else txt += ' · central em dia';
+            // o central respondeu, mas NAO aceitou: nao e "em dia" (programa/.bvr diferente?)
+            if (s.recusadas) {
+                txt += ` · ⚠ central RECUSOU ${s.recusadas} leitura(s): ${s.recusa_motivo || '?'}`;
+                cls = 'pendente';
+            }
+            if (s.erro_anotacoes) { txt += ' · classificação não subiu: ' + s.erro_anotacoes; cls = 'pendente'; }
         }
         st.textContent = txt;
         st.className = 'cad-status ' + cls;

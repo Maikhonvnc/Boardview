@@ -205,7 +205,8 @@ def validar_ajuste(placa, dados):
 # --- fase 2: consenso, sincronizacao com o central, copia do banco --------------------
 _SEM_PROXY = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # tailnet: direto
 _acordar_sync = threading.Event()
-_sync = {'ok_em': None, 'erro': None, 'copia': None, 'erro_copia': None, 'erro_anotacoes': None}
+_sync = {'ok_em': None, 'erro': None, 'copia': None, 'erro_copia': None, 'erro_anotacoes': None,
+         'recusadas': 0, 'recusa_motivo': None}   # recusadas: desde que este servidor subiu
 _trava_ajuste = threading.Lock()      # com threads, dois POST /ajuste nao gravam juntos
 COPIAS_CENTRAL = 14                   # dias de copia do banco central guardados em cada PC
 
@@ -294,9 +295,25 @@ def sincronizar():
                 and isinstance(r.get('rejeitadas'), list)
                 and len(r['aceitas']) + len(r['rejeitadas']) == len(pend)):
             raise ValueError('resposta do central nao confere com o lote')
-        for x in r['rejeitadas']:
-            # ficou gravada na tabela recusa do central, com o dado inteiro
-            print(f'[sync] central recusou {x.get("uuid")}: {x.get("motivo")}', file=sys.stderr)
+        if r['rejeitadas']:
+            # Ficou gravada na tabela recusa do central, com o dado inteiro, mas NAO entrou
+            # no caderno de la. O ponteiro anda (senao a fila travava para sempre), entao a
+            # bancada tem que DIZER: antes o painel mostrava "central em dia" e o voto sumia
+            # em silencio. Causa tipica: .bvr deste PC diferente do do central. Depois de
+            # igualar os programas: python medicoes_db.py reenviar.
+            motivos = {}
+            for x in r['rejeitadas']:
+                print(f'[sync] central recusou {x.get("uuid")}: {x.get("motivo")}', file=sys.stderr)
+                motivos[str(x.get('motivo'))[:80]] = motivos.get(str(x.get('motivo'))[:80], 0) + 1
+            _sync['recusadas'] = (_sync.get('recusadas') or 0) + len(r['rejeitadas'])
+            _sync['recusa_motivo'] = max(motivos, key=motivos.get)
+            try:
+                with open(os.path.join(MDB.DADOS, 'recusadas-pelo-central.jsonl'), 'a', encoding='utf-8') as f:
+                    for x in r['rejeitadas']:
+                        f.write(json.dumps({'em': _agora(), 'uuid': x.get('uuid'), 'motivo': x.get('motivo')},
+                                           ensure_ascii=False) + chr(10))
+            except OSError:
+                pass
         MDB.marcar_sync(pend[-1][0])
         total += len(pend)
 
