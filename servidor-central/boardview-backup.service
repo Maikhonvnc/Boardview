@@ -1,4 +1,4 @@
-# Backup do banco de medicoes: copia consistente (API de backup do SQLite), restauracao
+# Backup do banco de medicoes E das anotacoes (anotacoes-<data>.zip): copia consistente (API de backup do SQLite), restauracao
 # de teste (abre a copia e calcula o consenso) e guarda as 30 mais novas.
 # Disparado todo dia pelo boardview-backup.timer.
 [Unit]

@@ -15,7 +15,7 @@ Não é um site: roda num servidor local (`servidor.py`, porta 8777), offline, n
 | arquivo | o que é |
 |---|---|
 | `index.html` | estrutura + **todo o CSS** (é aqui que o design mora) |
-| `SCRIPT3.js` | motor de desenho em p5.js — **não é para redesenhar**, só para ler |
+| `nucleo.js` … `busca.js` (10 arquivos, antigo `SCRIPT3.js`) | motor de desenho em p5.js — **não é para redesenhar**, só para ler |
 | `ajuste_fundo.js` | alinhamento manual da foto |
 | `face_unica.js` | dobra as duas faces numa só |
 | `menu_modelo.js` | menu do modelo + botão HUB |
@@ -70,7 +70,7 @@ Se o redesenho criar botões novos, eles não substituem os atalhos.
 **1. Um `<select>` (ou qualquer controle) não funciona se os eventos chegarem ao p5.**
 O p5 escuta o mouse na janela e chama `preventDefault()`, o que impede um `<select>` nativo de
 abrir. Todo controle novo tem que ficar **dentro** de `#controls`, `#componentInfo` ou
-`#componentModal` — esses três já barram a propagação (`protegerControles()` em `SCRIPT3.js`).
+`#componentModal` — esses três já barram a propagação (`protegerControles()` em `inicio.js`).
 Fora deles, o controle nasce morto e **sem nenhum erro no console**. A barra de cima (`#topbar`) e
 o puxador do painel (`#btnPainel`) ficam fora dos três, por isso o `skin.js` repete a proteção
 neles — qualquer container novo precisa do mesmo tratamento.

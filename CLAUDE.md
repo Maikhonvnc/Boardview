@@ -209,7 +209,7 @@ the per-half contrast. When in doubt, look at the image — it is the only real 
 ### Viewer gotchas that look like broken features
 
 - **The board id is computed in `index.html`'s `preload` and published as `window.__board`;**
-  `SCRIPT3.js` reads that. They used to derive it independently, and when a browser held one of
+  `inicio.js` reads that. They used to derive it independently, and when a browser held one of
   the two files in cache they disagreed — the `.bvr` loaded for one board and the photo was
   fetched for another, so the photo silently vanished. Both script tags now carry `?v=`; bump it
   together with the asset `v` in `preload` whenever you touch them.
@@ -295,7 +295,7 @@ knowing before touching it:
 - **`rotular(el, txt)` replaces `el.innerHTML = 'emoji<br>TEXT'`.** The buttons now carry an inline
   `<svg>`, and writing `innerHTML` would erase it. The text lives in a `<span data-rot>`; with no
   such span `rotular` falls back to `innerHTML`, so the modules still work in an older `index.html`
-  (`SCRIPT3.js` defines a fallback copy for the same reason).
+  (`nucleo.js` defines a fallback copy for the same reason).
 - **Modules reuse the buttons instead of creating them.** `ajusteIniciar`, `botaoFaceUnica` and
   `botaoHub` look for their id first and only build one when it is missing. The two `<select>`s are
   still created in `#controls` by JS; `skin.js` moves them to the top bar and strips their inline
@@ -357,7 +357,7 @@ it: reset with R.
 | cross-side cursor (C) | `ajuste_fundo.js` | — |
 | photo adjust per half | `ajuste_fundo.js` | `localStorage`, exportable to `build/ajustes.json` |
 | rename components (N) | `renomear.js` | `localStorage`, exportable to `build/nomes.json` |
-| measured voltages (V) | `SCRIPT3.js` | `localStorage` per board+net |
+| measured voltages (V) | `tensao.js` | `localStorage` per board+net |
 | model menu, HUB button | `menu_modelo.js` | `build/modelos.json` (`gen_modelos.py`) |
 
 Every one of these follows the same pattern: `localStorage` is the working copy, and a JSON dropped
@@ -390,7 +390,7 @@ python servidor.py 8788       # another port, to test without touching a running
 ```
 On Windows a second `servidor.py` can bind 8777 even though one is already there (`SO_REUSEADDR`),
 and then requests are answered by whichever socket wins — which looks exactly like edits to
-`index.html`/`SCRIPT3.js` having no effect. If served content is stale, close every server window
+`index.html`/the viewer `.js` files having no effect. If served content is stale, close every server window
 before starting a new one, or use a different port.
 Then `http://127.0.0.1:8777/digital_viewer/index.html` (or `/HUB.html`). `Viewer DigitalBoard.bat`
 and `Viewer.bat` do both steps. The viewer must be served over HTTP — opening `index.html` from
@@ -448,7 +448,7 @@ never shipped by `empacotar_central.py`) and goes through the server:
   answers `{gravadas, recusadas}`; the browser and the bench drop/record the refused ones
   (`dados/anotacoes/recusadas-<placa>.json`). A whole-batch 400 made both queues retry forever when
   two PCs ran different versions of the program.
-- **Net identity** (`malhaCanon` in `SCRIPT3.js`, `canon` in `exportar_placa.py`): some `.bvr`
+- **Net identity** (`malhaCanon` in `tensao.js`, `canon` in `bvr.py`): some `.bvr`
   files name nets with a voltage prefix (`7P0_Net9`, `3P0Net18`, `VCC_3P2V_Net65`) while
   `malhas.json`, the annotations and `.cobre.json` use `Net9`. Always look a net up by the raw name
   and then by the canonical one. The trailing `Net<n>` is unique on every board.
@@ -461,3 +461,36 @@ Scripts around mode Q: `sugerir_placas.py` (topology suggestions for every board
 `exportar_placa.py <placa>` (one JSON with parts, names, types, nets, nicknames and readings, for
 external tools), `foto_viewer.py` (`SECOES_FORCADAS`, `CORTE_FORCADO` for boards whose automatic
 split is wrong).
+
+## Layout of the code after the Nov 2026 cleanup
+
+`SCRIPT3.js` (the p5 engine, 1,750 lines) was cut into ten files at whole-line boundaries, no code
+changed. They are classic scripts sharing one global scope, loaded by `index.html` in this order
+— the order matters because some of them run code at load time:
+
+| file | what is in it |
+|---|---|
+| `nucleo.js` | global state (`parts`, view, selection), `escHTML`, `tensaoValida` |
+| `tensao.js` | `boardKey`, `malhaCanon`, `apelidoMalha`, measured voltage per net (`setNetVoltage`) |
+| `inicio.js` | `setup()`, board picker, starts every module |
+| `desenho.js` | `draw()` |
+| `vista.js` | screen↔world conversion, `mouseWheel` (zoom and photo scale) |
+| `clique.js` | `mousePressed`/`Dragged`/`Released`, tooltip |
+| `painel.js` | `tensaoDoPino`, `netNameToVoltage`, `updateComponentInfo`, net component list, modal |
+| `pecas.js` | `renderBuffer`, net lines, component boxes and names |
+| `bvr.js` | `parseFile()` — the browser's `.bvr` reader |
+| `busca.js` | search, next pin in net, `windowResized`, `keyPressed` |
+
+The feature modules (`skin`, `renomear`, `diodo`, `medicoes`, `cobre`, `classificar`,
+`menu_modelo`, `face_unica`, `ajuste_fundo`) load before these. `servidor.py` only serves `.js`
+files directly inside `digital_viewer/` — a `js/` subfolder would 404.
+
+Python side: `bvr.py` is the one `.bvr` reader for scripts (`pecas()`, `canon()`); only
+`align_bvr.parse_bvr` (outline segments, photo pipeline) stays separate. `anotacoes.py` is the
+annotation store. Unused scripts and the old HTML viewers were archived into
+`arquivo-morto-2026-11-16.zip` (not in git; the code is also in the first commit).
+
+The repo is under git since 2026-11-16 with **code only**: board data (`digital_viewer/build`,
+`boards`, PDFs…) and `dados/` are ignored on purpose — third-party material and team state must not
+reach a public remote. `medicoes_db.py backup` (the central's daily timer) now also writes
+`anotacoes-<stamp>.zip` next to the database copy.

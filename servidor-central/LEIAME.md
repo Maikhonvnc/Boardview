@@ -90,6 +90,10 @@ servidor — faça os ajustes de foto no PC.
 - **Em cada PC:** a bancada baixa uma cópia do banco central (refeita a cada 6 h) em
   `dados\copia-central\` (14 dias), também conferida antes de guardar.
 - Conferir uma cópia à mão: `python3 medicoes_db.py conferir ARQUIVO`.
+- **Classificação e nomes** (modo Q do viewer) ficam em `/var/lib/boardview/anotacoes/` e entram
+  no mesmo backup diário, como `anotacoes-AAAA-MM-DD-HHMM.zip` (30 mais novos). Cada bancada
+  também guarda a sua cópia em `dadosnotacoes\`. Para restaurar: com o serviço parado, extraia
+  o zip em `/var/lib/boardview/anotacoes/` e acerte o dono (`chown -R boardview:boardview`).
 
 Restaurar o central a partir de um backup:
 

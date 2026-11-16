@@ -504,7 +504,35 @@ def backup(pasta_destino, manter=30, pasta=None):
     for velho in sorted(f for f in os.listdir(pasta_destino)
                         if f.startswith('medicoes-') and f.endswith('.sqlite3'))[:-manter]:
         os.remove(os.path.join(pasta_destino, velho))
+    r['anotacoes'] = _backup_anotacoes(pasta_destino, carimbo, manter, pasta)
     return alvo, r
+
+
+def _backup_anotacoes(pasta_destino, carimbo, manter, pasta=None):
+    """Classificacao/nomes (dados/anotacoes/*.json) num zip ao lado do banco, conferido
+    (cada JSON abre) antes de valer. Devolve quantas placas foram, ou 0 se nao ha nada."""
+    import zipfile, json
+    origem = os.path.join(pasta or DADOS, 'anotacoes')
+    arqs = sorted(f for f in os.listdir(origem) if f.endswith('.json')) if os.path.isdir(origem) else []
+    if not arqs:
+        return 0
+    alvo = os.path.join(pasta_destino, f'anotacoes-{carimbo}.zip')
+    tmp = alvo + '.conferindo'
+    with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as z:
+        for f in arqs:
+            z.write(os.path.join(origem, f), f)
+    try:
+        with zipfile.ZipFile(tmp) as z:
+            for f in arqs:
+                json.loads(z.read(f).decode('utf-8'))
+    except Exception:
+        os.remove(tmp)
+        raise
+    os.replace(tmp, alvo)
+    for velho in sorted(f for f in os.listdir(pasta_destino)
+                        if f.startswith('anotacoes-') and f.endswith('.zip'))[:-manter]:
+        os.remove(os.path.join(pasta_destino, velho))
+    return len(arqs)
 
 
 def situacao_sync(pasta=None):
@@ -546,7 +574,8 @@ if __name__ == '__main__':
         sys.stdout.write(exportar_csv(sys.argv[2] if len(sys.argv) > 2 else None))
     elif cmd == 'backup' and len(sys.argv) > 2:
         arq, r = backup(sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 30)
-        print(f'{arq}: {r["leituras"]} leituras, {r["placas"]} placas, conferido')
+        print(f'{arq}: {r["leituras"]} leituras, {r["placas"]} placas, conferido; '
+              f'anotacoes de {r["anotacoes"]} placa(s)')
     elif cmd == 'conferir' and len(sys.argv) > 2:
         print(conferir_copia(sys.argv[2]))
     elif cmd == 'reenviar':
