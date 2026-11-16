@@ -19,26 +19,16 @@
 import os, sys, glob, math, collections
 from paths import BV
 import anotacoes as ANOT
+import bvr as BVR
 
 DRONE = os.path.join(BV, 'digital_viewer', 'build', 'DRONE')
 FORA = {'GND', 'NC', 'UNCONNECTED', ''}
 
 
 def pecas(caminho):
-    out, peca, pino = [], None, None
-    for ln in open(caminho, encoding='utf-8', errors='replace'):
-        s = ln.split()
-        if not s:
-            continue
-        if s[0] == 'PART_NAME':
-            peca = {'id': s[1], 'p': []}
-            out.append(peca)
-        elif s[0] == 'PIN_ORIGIN' and peca:
-            pino = [float(s[1]), float(s[2]), '']
-            peca['p'].append(pino)
-        elif s[0] == 'PIN_NET' and pino is not None:
-            pino[2] = ' '.join(s[1:])
-    return out
+    """[{'id', 'p': [[x, y, malha], ...]}] — o formato enxuto que as regras abaixo usam."""
+    return [{'id': p['id'], 'p': [[q['x'], q['y'], q['malha']] for q in p['pinos'] if q['x'] is not None]}
+            for p in BVR.pecas(caminho)]
 
 
 def sugerir(caminho):

@@ -10,7 +10,7 @@
 import os, io, sys, json, tarfile, datetime, argparse
 from paths import BV, DRONES
 
-ARQUIVOS = ['servidor.py', 'paths.py', 'medicoes_db.py', 'consenso.py', 'anotacoes.py', 'sugerir_placas.py',
+ARQUIVOS = ['servidor.py', 'paths.py', 'medicoes_db.py', 'consenso.py', 'anotacoes.py', 'bvr.py', 'sugerir_placas.py',
             'exportar_placa.py', 'HUB.html', 'viewer.html', 'favicon.ico']
 PASTAS = ['digital_viewer', 'thumbs', 'boards', 'Malhas', 'Cadernos', 'Netlists', 'servidor-central']
 PASTAS_PDF = ['PDFs-Drone', 'DigitalBoard/pdf']
