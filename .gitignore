@@ -28,3 +28,6 @@ __pycache__/
 *.pyc
 *.tmp
 *.bak
+
+# listas de malhas das placas (dados das placas, nao vao pro repo publico)
+Malhas-templates/
