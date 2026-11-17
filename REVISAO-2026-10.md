@@ -23,9 +23,9 @@ concluíram; "antes" = quantos deles disseram que convém resolver antes de inst
 |  | carga | /api/consenso relê e recalcula todas as leituras da placa a cada pedido, inclusive as de reparo; sob carga a bancada mostra 'cópia, central fora' com o central no ar | nao verificado |  | `servidor.py` |
 |  | carga | Cópia do banco central: quando falha, a bancada baixa o banco inteiro de novo a cada leitura, e a falha não aparece na tela | nao verificado |  | `servidor.py` |
 |  | dados | 'Última leitura do par' segue a ordem de chegada no central: uma leitura velha que sincroniza tarde vence a correção | confirmed | 0/1 | `consenso.py` |
-|  | dados | Nome do técnico e OS sem normalizar: uma placa conta como 2 OS e uma pessoa como 2 votos | confirmed | 0/1 | `consenso.py` |
+| ✔ | dados | Nome do técnico e OS sem normalizar: uma placa conta como 2 OS e uma pessoa como 2 votos | confirmed | 0/1 | `consenso.py` |
 |  | dados | Restaurar o central perde as leituras feitas pelo link do central, e 'reenviar' não as recupera | confirmed | 0/1 | `servidor-central/LEIAME.md` |
-|  | dados | 'ESTA PLACA ⚠' compara o consenso com valor de outra placa (outra OS) e de outra condição | confirmed/partly | 2/2 | `digital_viewer/medicoes.js` |
+| ✔ | dados | 'ESTA PLACA ⚠' compara o consenso com valor de outra placa (outra OS) e de outra condição | confirmed/partly | 2/2 | `digital_viewer/medicoes.js` |
 |  | dados | Não há como retirar os votos de uma placa que não era boa (a moderação 'só o dono' não tem ferramenta) | nao verificado |  | `medicoes_db.py` |
 |  | dados | Apagar depois de corrigir faz o valor errado voltar a valer como voto | partly | 0/2 | `consenso.py` |
 |  | dados | Diodo digitado em mV (550) entra como 550 V e trava a validação; a partir de 1000 mV é recusado | partly | 1/2 | `medicoes_db.py` |
@@ -39,11 +39,11 @@ concluíram; "antes" = quantos deles disseram que convém resolver antes de inst
 |  | sync | A "cópia em cada PC" só acontece com o Viewer.bat aberto; no fluxo do LEIAME (técnico usa o link do central) ela nunca roda, e nada mostra que falta | partly | 2/2 | `servidor.py` |
 | ✔ | sync | Leitura que o central recusa (placa ou fp desconhecido) some do central em silêncio: o ponteiro anda, o CADERNO diz "central em dia" e ela não volta nem depois de atualizar o central | partly | 2/2 | `servidor.py` |
 |  | viewer | Malha renomeada com a tecla M que colide com apelido do malhas.json grava a leitura na malha ERRADA | confirmed | 0/1 | `digital_viewer/medicoes.js` |
-|  | viewer | 'ESTA PLACA' e 'ref' são por modelo, não por OS: o painel acusa a placa nova com o valor da anterior, e apagar o valor velho cancela o voto da placa anterior | confirmed/partly | 2/2 | `digital_viewer/medicoes.js` |
+| ✔ | viewer | 'ESTA PLACA' e 'ref' são por modelo, não por OS: o painel acusa a placa nova com o valor da anterior, e apagar o valor velho cancela o voto da placa anterior | confirmed/partly | 2/2 | `digital_viewer/medicoes.js` |
 | ✔ | viewer | CADERNO diz 'central em dia' quando o central RECUSOU a leitura, e a recusa nunca é reenviada | confirmed/partly | 2/2 | `digital_viewer/medicoes.js` |
-|  | viewer | Painel e cartão não se atualizam depois do V: o alerta 'ESTA PLACA ⚠' só aparece no próximo clique | partly | 0/1 | `digital_viewer/SCRIPT3.js` |
-|  | viewer | Nome do técnico e OS sem normalização: a mesma pessoa na mesma placa vira 2 votos e 2 OS | partly | 0/1 | `digital_viewer/medicoes.js` |
-|  | viewer | Alerta 'ESTA PLACA fora' compara leitura de outra condição (fonte x bateria, boot) | partly | 0/2 | `digital_viewer/medicoes.js` |
+| ✔ | viewer | Painel e cartão não se atualizam depois do V: o alerta 'ESTA PLACA ⚠' só aparece no próximo clique | partly | 0/1 | `digital_viewer/SCRIPT3.js` |
+| ✔ | viewer | Nome do técnico e OS sem normalização: a mesma pessoa na mesma placa vira 2 votos e 2 OS | partly | 0/1 | `digital_viewer/medicoes.js` |
+| ✔ | viewer | Alerta 'ESTA PLACA fora' compara leitura de outra condição (fonte x bateria, boot) | partly | 0/2 | `digital_viewer/medicoes.js` |
 |  | viewer | Trocar entre 127.0.0.1 e o link do central traz OS, condição e nome velhos daquela origem; leitura vai para a OS errada e substitui o voto dela | partly | 1/2 | `digital_viewer/medicoes.js` |
 
 ## Baixo
