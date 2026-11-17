@@ -7,14 +7,18 @@
 #   - So vota leitura de placa BOA (papel 'ref'), com OS, nao cancelada por 'retira'.
 #     Tensao medida no 'boot' e so informativa: nao vota.
 #   - Valores proximos formam um grupo (tolerancia abaixo). OL e um grupo proprio.
+#   - Tecnico e OS entram no voto NORMALIZADOS (chave_tecnico/chave_os): "Joao" e
+#     "joão", "OS 123" e "123" sao a mesma pessoa / a mesma placa. O banco guarda o
+#     texto como foi digitado (append-only); so a chave do voto e normalizada.
+#   - O grupo com MAIS votos e a base (decisao do dono, 2026-11-17): se 10 placas dao x
+#     e uma dita "boa" da y, o mais provavel e a "boa" nao estar boa. A minoria aparece
+#     em 'fora', nao derruba o ponto para divergente.
 #   - Estados:
 #       sem_dados       nenhum voto
 #       nao_confirmado  1 voto
-#       confirmado      grupo principal com >= 2 votos e >= 80% dos votos, e nenhum
-#                       outro grupo com 2 votos ou mais
+#       confirmado      grupo principal com >= 2 votos e MAIS votos que qualquer outro
 #       validado        confirmado + >= 3 votos no grupo principal, em >= 2 OS
-#       divergente      outro grupo com >= 2 votos, ou principal < 80% (com 3+ votos),
-#                       ou empate entre grupos. Mostra os grupos, nunca uma media.
+#       divergente      empate no primeiro lugar. Mostra os grupos, nunca uma media.
 # Parametros no topo; testes em teste_consenso.py (scratchpad) cobrem cada estado.
 
 TOL_DIODO = (0.025, 0.04)     # (absoluta em V, relativa) — o maior dos dois
@@ -22,7 +26,23 @@ TOL_TENSAO = (0.05, 0.03)
 MIN_CONFIRMADO = 2
 MIN_VALIDADO = 3
 MIN_OS_VALIDADO = 2
-FRACAO_PRINCIPAL = 0.80
+
+
+def chave_tecnico(t):
+    """'  João  Silva' -> 'joao silva' (sem acento, minusculo, espacos simples)."""
+    import unicodedata
+    t = unicodedata.normalize('NFKD', str(t or ''))
+    t = ''.join(c for c in t if not unicodedata.combining(c))
+    return ' '.join(t.casefold().split())
+
+
+def chave_os(o):
+    """'OS 123' / 'os-123' / '123' -> '123'. Tira o prefixo OS e a pontuacao; letras
+    do meio ficam ('123A' != '123')."""
+    import re
+    o = chave_tecnico(o)
+    o = re.sub(r'^o\.?s\.?(?![a-z])[\s.:#°-]*(no?(?![a-z])[\s.:#°-]*)?', '', o)   # "OS", "O.S.", "OS nº"
+    return re.sub(r'[^0-9a-z]', '', o)
 
 
 def _tol(tipo, v):
@@ -41,12 +61,12 @@ def votos(linhas):
     for r in linhas:
         if r['evento'] != 'medida' or r['uuid'] in canceladas:
             continue
-        if r['papel'] != 'ref' or not r.get('os'):
+        if r['papel'] != 'ref' or not chave_os(r.get('os')):
             continue
         if r.get('momento') == 'boot':
             continue
-        ultimo[(r['tecnico'], r['os'])] = r          # a ultima leitura do par vale
-    return [{'tecnico': r['tecnico'], 'os': r['os'], 'valor': r['valor'],
+        ultimo[(chave_tecnico(r['tecnico']), chave_os(r['os']))] = r   # a ultima do par vale
+    return [{'tecnico': chave_tecnico(r['tecnico']), 'os': chave_os(r['os']), 'valor': r['valor'],
              'valor_num': r['valor_num'], 'categoria': r['categoria'], 'seq': r['seq']}
             for r in ultimo.values()]
 
@@ -91,14 +111,12 @@ def calcular(tipo, linhas):
     principal = grupos[0]
     outros = grupos[1:]
     empate = bool(outros) and outros[0]['n'] == principal['n']
-    fracao = principal['n'] / total
-    outro_forte = any(g['n'] >= MIN_CONFIRMADO for g in outros)
 
     if total == 1:
         estado = 'nao_confirmado'
-    elif empate or outro_forte or (total >= 3 and fracao < FRACAO_PRINCIPAL):
+    elif empate:
         estado = 'divergente'
-    elif principal['n'] >= MIN_CONFIRMADO and fracao >= FRACAO_PRINCIPAL:
+    elif principal['n'] >= MIN_CONFIRMADO:
         estado = 'confirmado'
         if principal['n'] >= MIN_VALIDADO and len(principal['os']) >= MIN_OS_VALIDADO:
             estado = 'validado'

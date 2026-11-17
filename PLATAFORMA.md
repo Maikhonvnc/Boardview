@@ -75,10 +75,12 @@ Cada V / Shift+V e D / Shift+D vira uma leitura gravada em `dados/medicoes.sqlit
 Servidor da empresa: **Linux, Grafana instalado direto (systemd)**, pelo Tailscale.
 Passo a passo de instalação: **`servidor-central/LEIAME.md`**.
 
-- [x] `consenso.py`: a regra, num lugar só. Voto = (técnico, OS); só placa boa com OS;
-  "boot" e placa em reparo não votam; última leitura do par vale; "retira" cancela.
-  Validado = 3 votos concordantes em 2 OS ou mais, 80% no grupo principal, sem outro
-  grupo com 2 votos. 21 testes (`teste_consenso.py`, no scratchpad da sessão).
+- [x] `consenso.py`: a regra, num lugar só. Voto = (técnico, OS), os dois normalizados
+  (acento/maiúsculas/prefixo "OS" não contam); só placa boa com OS; boot não vota.
+  **2026-11-17 (decisão do dono): o grupo com mais votos é a base** — 10 placas com x e
+  uma "boa" com y: o y aparece em "fora", não deixa o ponto divergente. Divergente só em
+  empate no primeiro lugar. Confirmado = principal ≥ 2 votos; validado = ≥ 3 votos em
+  ≥ 2 OS. Testes em `testes/test_consenso.py`.
 - [x] `GET /api/consenso?placa=` → `{fp, origem, tolerancia, versoes: {fp: {alvo: {tipo:
   {condicao: resultado}}}}}`. Na bancada vem do central (e fica uma cópia em
   `dados/consenso/`); central fora → a cópia; sem cópia → só as leituras do PC, com aviso.

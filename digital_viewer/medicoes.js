@@ -53,9 +53,22 @@ function limparNome(s) {
         .trim();
 }
 // mesma regra do servidor: comeca por letra/numero, depois letras, numeros e . _ / - espaco
+// O prefixo "OS" sai ("OS 123" -> "123"); o consenso.py normaliza de novo no voto
+// (maiusculas, acento, pontuacao), entao leituras antigas com "OS 123" contam igual.
 function limparOS(s) {
     return String(s || '').replace(/[^A-Za-z0-9 ._/-]/g, '').replace(/^[^A-Za-z0-9]+/, '')
-        .slice(0, 30).trim();
+        .replace(/^o\.?s\.?(?![a-z])[\s.:#-]*/i, '').slice(0, 30).trim();
+}
+
+// A leitura de ESTA placa (V/D, papel 'reparo') que esta na tela foi feita NESTA OS e
+// nesta condicao? O localStorage e por modelo: sem isto o painel acusava a placa nova
+// com o valor da anterior (revisao de outubro).
+function cadernoLeituraAtual(net, tipo) {
+    const alvo = alvoMedicao(net);
+    const ult = alvo && lsLer(CADERNO.ultimas, {})[`${boardKey}|${alvo}|${tipo}|reparo`];
+    if (!ult || (ult.os || null) !== (limparOS(lsLer(CADERNO.os, '')) || null)) return false;
+    return tipo !== 'tensao' || (ult.alimentacao === lsLer(CADERNO.alim, 'fonte') &&
+                                 ult.momento === lsLer(CADERNO.momento, 'estavel'));
 }
 
 // O nome vem ANTES do valor (setNetVoltage e anotarDiodo chamam isto primeiro): cancelar
@@ -112,6 +125,11 @@ function cadernoRegistrar({ tipo, papel, net, valor }) {
         }
     } else if (!ult) {
         return;                 // apagar algo que este navegador nunca anotou: nada a cancelar
+    } else if ((ult.os || null) !== os) {
+        // o valor na tela e de OUTRA OS (outra placa): apagar limpa a tela, nao cancela
+        // o voto daquela placa
+        cadernoAviso('valor era de outra OS: limpei só da tela, o caderno continua com ele');
+        return;
     }
     const ev = {
         uuid: uuid4(), evento: valor ? 'medida' : 'retira', placa: boardKey, fp: cadernoFp,
@@ -144,6 +162,25 @@ function cadernoRegistrar({ tipo, papel, net, valor }) {
     if (papel === 'ref' && valor && !os) cadernoAviso('referência sem OS: fica no caderno, mas não vai contar como voto');
     cadernoPintar();
     cadernoEnviar();
+}
+
+// Trocou a OS = outra placa na bancada. Os valores de ESTA placa (V e D) sao por
+// modelo no navegador; perguntar se limpa a tela (o caderno continua com tudo).
+function cadernoTrocouDePlaca(osAntes) {
+    const temV = typeof userVolts !== 'undefined' && Object.keys(userVolts).length;
+    const dd = typeof diodosCarregar === 'function' ? diodosCarregar() : {};
+    const temD = Object.values(dd).some(d => d && d.med != null);
+    if (!temV && !temD) return;
+    if (!confirm(`OS mudou (era ${osAntes}). Limpar da tela as tensões e diodos da placa anterior?
+` +
+                 '(as referências e o caderno não mudam)')) return;
+    if (temV) { for (const k of Object.keys(userVolts)) delete userVolts[k]; saveUserVolts(); }
+    if (temD) {
+        for (const k of Object.keys(dd)) { if (dd[k]) delete dd[k].med; if (dd[k] && dd[k].ref == null) delete dd[k]; }
+        diodosSalvar(dd);
+    }
+    if (typeof painelRepintar === 'function') painelRepintar();
+    if (typeof redraw === 'function') redraw();
 }
 
 async function cadernoPostar(lote) {
@@ -318,7 +355,7 @@ function consensoLinhas(pin) {
     const ct = ponto.tensao && ponto.tensao[alim];
     if (ct) {
         const meu = typeof userVolts !== 'undefined' ? userVolts[pin.net] : null;
-        const fora = consensoFora(ct, 'tensao', meu);
+        const fora = cadernoLeituraAtual(pin.net, 'tensao') && consensoFora(ct, 'tensao', meu);
         linhas.push({ rotulo: `REF ${alim.toUpperCase()}:`, classe: fora ? 'fora' : ct.estado,
                       texto: consensoTexto(ct, ' V') + origem + (fora ? ` · ESTA PLACA ${meu} V ⚠` : '') });
     }
@@ -326,7 +363,7 @@ function consensoLinhas(pin) {
     if (cd) {
         const d = typeof diodoDe === 'function' ? diodoDe(pin.net) : null;
         const meu = d ? d.med : null;
-        const fora = consensoFora(cd, 'diodo', meu);
+        const fora = cadernoLeituraAtual(pin.net, 'diodo') && consensoFora(cd, 'diodo', meu);
         linhas.push({ rotulo: 'REF DIODO:', classe: fora ? 'fora' : cd.estado,
                       texto: consensoTexto(cd, '') + origem + (fora ? ` · ESTA PLACA ${meu} ⚠` : '') });
     }
@@ -440,7 +477,13 @@ function cadernoIniciar() {
     const os = $('cadOS');
     if (os) {
         os.addEventListener('input', () => lsGravar(CADERNO.os, limparOS(os.value)));
-        os.addEventListener('change', () => { os.value = limparOS(os.value); lsGravar(CADERNO.os, os.value); });
+        let osAntes = limparOS(lsLer(CADERNO.os, ''));
+        os.addEventListener('focus', () => { osAntes = limparOS(lsLer(CADERNO.os, '')); });
+        os.addEventListener('change', () => {
+            os.value = limparOS(os.value); lsGravar(CADERNO.os, os.value);
+            if (osAntes && os.value !== osAntes) cadernoTrocouDePlaca(osAntes);
+            osAntes = os.value;
+        });
     }
     for (const [id, chave] of [['cadAlim', CADERNO.alim], ['cadMomento', CADERNO.momento]]) {
         document.querySelectorAll(`#${id} button`).forEach(b => b.addEventListener('click', (e) => {
