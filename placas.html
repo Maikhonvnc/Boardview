@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Placas — Boardview</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="digital_viewer/portao.js?v=30"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0B100E;color:#e6edf3;font:15px/1.5 system-ui,sans-serif}
+header{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:16px 24px;border-bottom:1px solid #22302a}
+header img{height:34px;background:#1f6f5a;border-radius:8px;padding:5px}
+h1{font-size:19px;margin:0;flex:1}
+#busca{font:inherit;padding:8px 12px;border-radius:8px;border:1px solid #2b3a34;background:#131A17;color:inherit;width:min(300px,100%)}
+header a{color:#8fb3a4}
+main{padding:8px 24px 40px;max-width:1500px;margin:0 auto}
+h2{font-size:14px;color:#8fb3a4;margin:22px 0 10px;font-weight:600}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.grade a{display:block;background:#131A17;border:1px solid #22302a;border-radius:12px;overflow:hidden;color:inherit;text-decoration:none}
+.grade a:hover,.grade a:focus-visible{border-color:#ee7f12}
+.foto{height:140px;background:#070a09 center/contain no-repeat}
+.nome{padding:10px 12px;font-weight:600}
+[hidden]{display:none!important}
+</style></head><body>
+<header><img src="digital_viewer/assets/gd-logo-white.svg" alt=""><h1>Boardview</h1>
+<input id="busca" type="search" placeholder="procurar placa" aria-label="procurar placa">
+<a href="entrar.html?sair=1">Sair</a></header>
+<main id="lista">carregando…</main>
+<script>
+const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
+const B = 'digital_viewer/build/', pega = f => fetch(B + f).then(r => r.ok ? r.json() : null);
+(async () => {
+    const [placas, ix] = await Promise.all([pega('boards.json'), pega('modelos.json').catch(() => null)]);
+    if (!placas) throw new Error('sem acesso às placas');
+    const grupos = new Map(), lista = document.getElementById('lista');
+    for (const p of placas) {
+        const g = (ix && ix.de_placa[p.id]) || 'Outras';
+        if (!grupos.has(g)) grupos.set(g, []);
+        grupos.get(g).push(p);
+    }
+    lista.textContent = '';
+    for (const nome of [...grupos.keys()].sort((a, b) => (a === 'Outras') - (b === 'Outras') || a.localeCompare(b))) {
+        const s = el('section'), grade = el('div', 'grade');
+        s.append(el('h2', '', nome), grade);
+        for (const p of grupos.get(nome)) {
+            const a = el('a'), f = el('div', 'foto');
+            a.href = 'digital_viewer/index.html?board=' + encodeURIComponent(p.id);
+            a.dataset.busca = (nome + ' ' + p.name + ' ' + p.id).toLowerCase();
+            f.dataset.img = p.foto ? 'FOTO/' + p.id + '_s0.jpg' : p.borda ? 'SM/' + p.id + '_borda.jpg' : '';
+            a.append(f, el('div', 'nome', p.name));
+            grade.append(a);
+        }
+        lista.append(s);
+    }
+    // so baixa a foto do que aparece na tela
+    const olho = new IntersectionObserver(es => es.forEach(e => {
+        if (!e.isIntersecting) return;
+        olho.unobserve(e.target);
+        if (e.target.dataset.img) e.target.style.backgroundImage = 'url("' + B + e.target.dataset.img + '")';
+    }), { rootMargin: '150px' });
+    document.querySelectorAll('.foto').forEach(f => olho.observe(f));
+    document.getElementById('busca').addEventListener('input', ev => {
+        const q = ev.target.value.trim().toLowerCase();
+        document.querySelectorAll('.grade a').forEach(a => { a.hidden = !a.dataset.busca.includes(q); });
+        document.querySelectorAll('section').forEach(s => { s.hidden = !s.querySelector('a:not([hidden])'); });
+    });
+})().catch(e => { document.getElementById('lista').textContent = 'Não consegui carregar: ' + e.message; });
+</script></body></html>

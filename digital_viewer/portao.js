@@ -3,17 +3,19 @@
 // NAO e ele que protege as placas: e o banco (nuvem/esquema.sql).
 (function () {
     if (!/\.github\.io$/.test(location.hostname) && location.port !== '8799') return;
-    const entrar = () => location.replace('../entrar.html?volta=' + encodeURIComponent(location.href));
+    window.BV_NUVEM_ATIVA = true;            // sem servidor.py: sem HUB local nem /_drones/
+    const raiz = new URL('../', document.currentScript.src).href;
+    const entrar = () => location.replace(raiz + 'entrar.html?volta=' + encodeURIComponent(location.href));
     const sw = navigator.serviceWorker;
     if (!sw) return entrar();
     if (!sw.controller) {                    // primeira visita ou Ctrl+F5
         window.stop();
         return entrar();
     }
-    fetch('../__sessao').then(r => r.json()).then(j => {
+    fetch(raiz + '__sessao').then(r => r.json()).then(j => {
         if (!j.nome) return entrar();
         // o nome do caderno e o do login (o banco grava esse de qualquer jeito)
-        const por = () => { lsGravar(CADERNO.tecnico, j.nome); cadernoPintar(); };
+        const por = () => { if (typeof CADERNO === 'undefined') return; lsGravar(CADERNO.tecnico, j.nome); cadernoPintar(); };
         if (document.readyState === 'complete') por(); else window.addEventListener('load', por);
     }).catch(entrar);
     // link do CSV: /api/ fica fora da pasta do site, entao navegar ate la daria 404

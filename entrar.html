@@ -21,8 +21,8 @@ const usuario = n => n.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().re
 // so volta para uma pagina DESTE site
 function seguir() {
     let v = new URLSearchParams(location.search).get('volta') || '';
-    const u = new URL(v || 'digital_viewer/index.html', location.href), raiz = new URL('./', location.href).href;
-    location.replace(u.href.startsWith(raiz) ? u.href : raiz + 'digital_viewer/index.html');
+    const u = new URL(v || 'placas.html', location.href), raiz = new URL('./', location.href).href;
+    location.replace(u.href.startsWith(raiz) ? u.href : raiz + 'placas.html');
 }
 (async () => {
     if (!('serviceWorker' in navigator)) return msg('Este navegador não serve: use Chrome, Edge ou Firefox atualizado, fora da janela anônima.');

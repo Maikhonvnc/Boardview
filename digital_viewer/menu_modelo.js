@@ -49,7 +49,7 @@ function montarMenuModelo() {
             }
             sel.appendChild(g);
         }
-        if (m.arquivos.length) {
+        if (m.arquivos.length && !window.BV_NUVEM_ATIVA) {   // PDFs so existem na bancada
             const g = document.createElement('optgroup');
             g.label = 'mapas e fotos';
             for (const a of m.arquivos) {
@@ -84,5 +84,5 @@ function botaoHub() {
         b.title = 'Voltar para o hub';
         ctr.insertBefore(b, ctr.firstChild);
     }
-    b.onclick = (e) => { e.preventDefault(); location.href = '../HUB.html'; };
+    b.onclick = (e) => { e.preventDefault(); location.href = window.BV_NUVEM_ATIVA ? '../placas.html' : '../HUB.html'; };
 }
