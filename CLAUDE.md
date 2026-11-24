@@ -494,3 +494,13 @@ The repo is under git since 2026-11-16 with **code only**: board data (`digital_
 `boards`, PDFs…) and `dados/` are ignored on purpose — third-party material and team state must not
 reach a public remote. `medicoes_db.py backup` (the central's daily timer) now also writes
 `anotacoes-<stamp>.zip` next to the database copy.
+
+## Nuvem (GitHub Pages + Supabase)
+
+Site: https://maikhonvnc.github.io/Boardview/ . `sw.js` responde no navegador os mesmos enderecos do
+`servidor.py` (`/api/*`, `/ajuste/*`, `build/*`), usando o Supabase; o viewer e o mesmo. `portao.js` so
+age em `*.github.io`. A seguranca e `nuvem/esquema.sql` (tabelas fechadas, funcoes `bv_*`, bucket privado).
+Regra do consenso em dois lugares: `consenso.py` e `consenso_nuvem.js` (o teste `test_consenso_js.py`
+compara). `nuvem/nuvem.py`: enviar, tecnico, cortar, listar, backup-ligar, backup, restaurar; pede a chave
+secreta, que nunca vai para arquivo nem para o chat. O repo e PUBLICO: nada de placas, `dados/`, `HUB.html`
+nem caminhos do PC. Ao mudar JS do viewer, subir o `?v=` do `index.html`.
