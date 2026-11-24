@@ -31,3 +31,6 @@ __pycache__/
 
 # listas de malhas das placas (dados das placas, nao vao pro repo publico)
 Malhas-templates/
+
+# gerado, com caminhos deste PC
+HUB.html
