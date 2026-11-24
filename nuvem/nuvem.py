@@ -195,8 +195,10 @@ MANTER = 60
 
 
 def _ps(comando, **amb):
+    # terminal PowerShell 7 deixa um PSModulePath que quebra os modulos do 5.1: sem ele, o 5.1 usa o seu
+    amb = dict({k: v for k, v in os.environ.items() if k.upper() != 'PSMODULEPATH'}, **amb)
     r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', comando], capture_output=True,
-                       text=True, env=dict(os.environ, **amb), creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                       text=True, env=amb, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     if r.returncode:
         raise RuntimeError('powershell: ' + r.stderr[:400])
     return r.stdout.strip()
