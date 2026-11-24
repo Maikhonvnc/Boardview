@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Entrar — Boardview</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0B100E;color:#e6edf3;font:16px system-ui,sans-serif}
+form{width:min(320px,88vw);display:grid;gap:12px}
+h1{font-size:20px;margin:0}
+input,button{font:inherit;padding:10px 12px;border-radius:8px;border:1px solid #2b3a34;background:#131A17;color:inherit}
+button{background:#1f6f43;border-color:#1f6f43;cursor:pointer}button:disabled{opacity:.5}
+#msg{min-height:1.4em;color:#fbbf24;font-size:14px}
+</style></head><body>
+<form id="f"><h1>Boardview</h1>
+<label>Nome<br><input id="nome" autocomplete="username" required style="width:100%;box-sizing:border-box"></label>
+<label>Código<br><input id="codigo" type="password" autocomplete="current-password" required style="width:100%;box-sizing:border-box"></label>
+<button id="b" disabled>Entrar</button><div id="msg">preparando…</div></form>
+<script src="nuvem-config.js"></script>
+<script>
+const $ = id => document.getElementById(id), msg = t => { $('msg').textContent = t; };
+// mesma regra do nuvem/nuvem.py (usuario)
+const usuario = n => n.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// so volta para uma pagina DESTE site
+function seguir() {
+    let v = new URLSearchParams(location.search).get('volta') || '';
+    const u = new URL(v || 'digital_viewer/index.html', location.href), raiz = new URL('./', location.href).href;
+    location.replace(u.href.startsWith(raiz) ? u.href : raiz + 'digital_viewer/index.html');
+}
+(async () => {
+    if (!('serviceWorker' in navigator)) return msg('Este navegador não serve: use Chrome, Edge ou Firefox atualizado, fora da janela anônima.');
+    if (!BV_NUVEM.chave) return msg('Falta configurar a chave em nuvem-config.js.');
+    const pronto = navigator.serviceWorker.controller ? Promise.resolve()
+        : new Promise(r => navigator.serviceWorker.addEventListener('controllerchange', r, { once: true }));
+    const reg = await navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' });
+    if (!navigator.serviceWorker.controller && reg.active) {          // Ctrl+F5: recarrega normal
+        if (!sessionStorage.bvRecarregou) { sessionStorage.bvRecarregou = 1; return location.reload(); }
+    }
+    await pronto;
+    delete sessionStorage.bvRecarregou;
+    if (new URLSearchParams(location.search).has('sair')) await fetch('__sessao', { method: 'DELETE' });
+    else if ((await (await fetch('__sessao')).json()).nome) return seguir();
+    $('b').disabled = false; msg('');
+})().catch(e => msg('Não consegui preparar: ' + e.message));
+$('f').addEventListener('submit', async ev => {
+    ev.preventDefault(); $('b').disabled = true; msg('entrando…');
+    try {
+        const cab = { apikey: BV_NUVEM.chave, 'Content-Type': 'application/json' };
+        const r = await fetch(BV_NUVEM.url + '/auth/v1/token?grant_type=password', { method: 'POST', headers: cab,
+            body: JSON.stringify({ email: usuario($('nome').value) + '@tecnico.boardview.local', password: $('codigo').value.replace(/\s/g, '').toUpperCase() }) });
+        if (!r.ok) throw new Error(r.status === 400 ? 'Nome ou código errado.' : r.status === 429 ? 'Muitas tentativas, espere um pouco.' : 'Servidor respondeu ' + r.status);
+        const j = await r.json();
+        const q = await fetch(BV_NUVEM.url + '/rest/v1/rpc/bv_tecnico', { method: 'POST', body: '{}',
+            headers: Object.assign({}, cab, { Authorization: 'Bearer ' + j.access_token }) });
+        const nome = q.ok ? await q.json() : null;
+        if (!nome) throw new Error('Acesso desativado.');
+        const g = await fetch('__sessao', { method: 'POST', body: JSON.stringify({ nome, access_token: j.access_token,
+            refresh_token: j.refresh_token, expira: Date.now() + j.expires_in * 1000 }) });
+        if (!g.ok) throw new Error('Não consegui guardar o login neste navegador.');
+        seguir();
+    } catch (e) { msg(e.message); $('b').disabled = false; }
+});
+</script></body></html>
